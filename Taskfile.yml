@@ -1,0 +1,52 @@
+version: '3'
+
+tasks:
+  run:
+    desc: Запуск приложения в режиме разработки
+    cmds:
+      - go run ./cmd/app
+
+  build:
+    desc: Компиляция бинарного файла приложения
+    cmds:
+      - go build -o bin/app ./cmd/app
+
+  test:
+    desc: Запуск обычных юнит-тестов (без кэша)
+    cmds:
+      - go test ./... -count=1
+
+  race:
+    desc: Запуск тестов с детектором состояния гонки
+    cmds:
+      - go test ./... -race -count=1
+
+  lint:
+    desc: Проверка кода линтером golangci-lint
+    cmds:
+      - golangci-lint run ./...
+
+  cover:
+    desc: Анализ покрытия кода тестами и вывод отчета в браузер
+    cmds:
+      - go test ./... -coverprofile=coverage.out
+      - go tool cover -html=coverage.out
+
+  clean:
+    desc: Очистка временных файлов и папки сборки
+    cmds:
+      - defer: { task: clean-files }
+    # Используем внутренние команды Task для кроссплатформенного удаления папок/файлов
+    platforms:
+      windows:
+        cmds:
+          - cmd: rmdir /s /q bin
+            ignore_error: true
+          - cmd: del /f /q coverage.out
+            ignore_error: true
+      linux:
+        cmds:
+          - rm -rf bin coverage.out
+      darwin:
+        cmds:
+          - rm -rf bin coverage.out

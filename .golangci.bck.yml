@@ -1,0 +1,24 @@
+run:
+  timeout: 3m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck      # Стандартный линтер (проверка необработанных ошибок)
+    - govet         # Стандартный линтер (поиск очевидных багов)
+    - ineffassign   # Стандартный линтер (неиспользуемые присваивания)
+    - staticcheck   # Стандартный линтер (продвинутый анализ)
+    - unused        # Стандартный линтер (неиспользуемый код)
+    - bodyclose     # Незакрытый resp.Body
+    - errorlint     # Сравнение ошибок через == вместо errors.Is
+    - copyloopvar   # Проверка копирования переменных цикла
+    - misspell      # Опечатки в комментариях и тексте
+    - unconvert     # Лишние приведения типов
+    - wastedassign  # Растраченные присваивания
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
