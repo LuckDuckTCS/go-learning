@@ -42,7 +42,7 @@ func (s *IntSet) String() string {
 			continue
 		}
 		for j := 0; j < 64; j++ {
-			if word&(1<<uint(j)) != 0 {
+			if word&(uint64(1)<<uint(j)) != 0 {
 				if buf.Len() > len("{") {
 					buf.WriteByte(' ')
 				}
@@ -97,4 +97,54 @@ func (s *IntSet) AddAll(nums ...int) {
 	for _, num := range nums {
 		s.Add(num)
 	}
+}
+
+// упр 6.3 методы IntersectWith, DifferenceWith и SymmetricDifference
+
+// IntersectWith делает множество s равным пересечению множеств s и t.
+func (s *IntSet) IntersectWith(t *IntSet) {
+	for i, tword := range t.words {
+		if i < len(s.words) {
+			s.words[i] &= tword
+		}
+	}
+	if len(s.words) > len(t.words) {
+		clear(s.words[len(t.words):])
+		//s.words = s.words[:len(t.words)]
+	}
+}
+
+// DifferenceWith делает множество s равным разности множеств s и t.
+func (s *IntSet) DifferenceWith(t *IntSet) {
+	for i, tword := range t.words {
+		if i < len(s.words) {
+			s.words[i] &^= tword
+		}
+	}
+}
+
+// SymmetricDifference делает множество s равным симметричной разности множеств s и t.
+func (s *IntSet) SymmetricDifference(t *IntSet) {
+	sCopy := s.Copy()
+	tCopy := t.Copy()
+	sCopy.DifferenceWith(t)
+	tCopy.DifferenceWith(s)
+	sCopy.UnionWith(tCopy)
+	*s = *sCopy
+}
+
+// Elems возвращает срез, содержащий элементы множества и годящийся для итерирования с использованием цикла по диапазону range.
+func (s *IntSet) Elems() []int {
+	result := []int{} //можно result = make([]int, len(s.words)/64)
+	for i, word := range s.words {
+		if word == 0 {
+			continue
+		}
+		for j := 0; j < 64; j++ {
+			if word&(uint64(1)<<uint(j)) != 0 {
+				result = append(result, 64*i+j)
+			}
+		}
+	}
+	return result
 }
