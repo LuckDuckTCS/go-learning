@@ -56,40 +56,36 @@ func (s *IntSet) String() string {
 
 // Возвращает количество элементов
 func (s *IntSet) Len() int {
-	var result int
+	var count int
 	for _, word := range s.words {
-		if word == 0 {
-			continue
-		}
-		for j := 0; j < 64; j++ {
-			if word&(1<<uint(j)) != 0 {
-				result++
+		for i := 0; i < 64; i++ {
+			if word&(uint64(1)<<uint(i)) != 0 {
+				count++
 			}
 		}
 	}
-	return result
+	return count
 }
 
 // Удаляет x из множества
 func (s *IntSet) Remove(x int) {
-	word, bit := x/64, uint(x%64)
+	word, bit := x/64, x%64
 	if word < len(s.words) {
-		s.words[word] &^= (1 << bit)
+		s.words[word] &^= (uint64(1) << bit)
 	}
 }
 
-// Удаляет все элементы множества
+// удаляет все элементы множества
 func (s *IntSet) Clear() {
-	for i := range s.words {
-		s.words[i] = 0
-	}
+	clear(s.words)
 }
 
-// Возвращает копию множества
+// возвращает копию множества
 func (s *IntSet) Copy() *IntSet {
-	result := &IntSet{words: make([]uint64, len(s.words))}
-	copy(result.words, s.words)
-	return result
+	var sNew IntSet
+	sNew.words = make([]uint64, len(s.words))
+	copy(sNew.words, s.words)
+	return &sNew
 }
 
 // Добавляет группу элементов
