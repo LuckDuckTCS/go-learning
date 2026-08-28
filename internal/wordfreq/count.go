@@ -6,6 +6,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 type Pair struct {
@@ -22,12 +23,12 @@ func Count(r io.Reader) ([]Pair, error) {
 	// читаем
 	for scanner.Scan() {
 		word := scanner.Text()
-		if scanner.Err() != nil {
-			word = strings.ToLower(word)
-			word = strings.Trim(word, ".,!?;:-()\"'")
-			m[word]++
-		}
 
+		word = strings.ToLower(word)
+		word = strings.TrimFunc(word, func(r rune) bool {
+			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+		})
+		m[word]++
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
