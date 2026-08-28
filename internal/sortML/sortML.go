@@ -1,5 +1,7 @@
 package sortml
 
+import "sort"
+
 //Упражнение 7.8. Многие графические интерфейсы предоставляют таблицы с
 //многоуровневой сортировкой с сохранением состояния: первичный ключ определяется
 //по последнему щелчку на заголовке, вторичный — по предпоследнему и т.д.
@@ -25,3 +27,14 @@ func (x *SortML) Less(i, j int) bool {
 }
 
 func (x *SortML) Swap(i, j int) { x.Table[i], x.Table[j] = x.Table[j], x.Table[i] }
+
+func IsPalindrome(s sort.Interface) bool {
+	size := s.Len()
+	n := size / 2
+	for i := range n {
+		if s.Less(i, size-i-1) || s.Less(size-i-1, i) {
+			return false
+		}
+	}
+	return true
+}
