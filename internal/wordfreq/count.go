@@ -3,6 +3,8 @@ package wordfreq
 import (
 	"bufio"
 	"cmp"
+	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -13,6 +15,8 @@ type Pair struct {
 	Word  string
 	Count int
 }
+
+var ErrEmptyInput = errors.New("no words found in input")
 
 func Count(r io.Reader) ([]Pair, error) {
 	result := []Pair{}
@@ -28,11 +32,19 @@ func Count(r io.Reader) ([]Pair, error) {
 		word = strings.TrimFunc(word, func(r rune) bool {
 			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 		})
-		m[word]++
+		if word != "" {
+			m[word]++
+		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("scanning words: %w", err)
 	}
+
+	// проверим: пуста ли карта
+	if len(m) == 0 {
+		return result, fmt.Errorf("counting words: %w", ErrEmptyInput)
+	}
+
 	// из карты в срез
 	for key, value := range m {
 		result = append(result, Pair{Word: key, Count: value})
