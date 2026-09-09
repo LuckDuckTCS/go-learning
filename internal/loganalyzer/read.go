@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -34,6 +35,7 @@ func ScanDir(dir string) ([]string, error) {
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if d != nil && d.IsDir() {
+				fmt.Fprintf(os.Stderr, "skip %s: %v\n", path, err)
 				return fs.SkipDir
 			}
 			return nil
@@ -70,4 +72,21 @@ func ScanLinesSlice(r io.Reader) (int, error) {
 		return 0, fmt.Errorf("scanning lines: %w", err)
 	}
 	return len(lines), nil
+}
+
+func CountFile(path string) (n int, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, fmt.Errorf("open file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close input: %w", closeErr)
+		}
+	}()
+	n, err = ScanLines(f)
+	if err != nil {
+		return 0, fmt.Errorf("scan lines: %w", err)
+	}
+	return n, nil
 }

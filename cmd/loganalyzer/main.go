@@ -1,11 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/LuckDuckTCS/go-learning/internal/loganalyzer"
 )
@@ -33,30 +36,115 @@ func main() {
 
 func run(args []string) (err error) {
 
-	fs := flag.NewFlagSet("loggen", flag.ContinueOnError)
-	path := fs.String("in", "testdata/big.log", "path to log file")
+	fs := flag.NewFlagSet("loganalyzer", flag.ContinueOnError)
+	format := fs.String("format", "text", "output format: text|json|csv")
+	top := fs.Int("top", 0, "number of entries in top lists (0 = all)")
+	outPath := fs.String("out", "-", "output path (- for stdout)")
+	fromStr := fs.String("from", "", "start time (2026-08-01)")
+	toStr := fs.String("to", "", "finish time (default: no limit)")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("parse flags: %w", err)
 	}
 
-	f, err := os.Open(*path)
-	if err != nil {
-		return fmt.Errorf("open file %s: %w", *path, err)
+	// валидация top
+	if *top < 0 {
+		return &InvalidFlagError{Flag: "top", Value: strconv.Itoa(*top)}
 	}
 
-	defer func() {
-		if closeErr := f.Close(); closeErr != nil && err == nil {
-			err = fmt.Errorf("close file: %w", closeErr)
+	// разбор дат
+	var fromDate, toDate time.Time
+
+	if *fromStr != "" {
+		fromDate, err = time.ParseInLocation(time.DateOnly, *fromStr, time.Local)
+		if err != nil {
+			return fmt.Errorf("parse -from: %w", err)
 		}
-	}()
-
-	r := bufio.NewReader(f)
-
-	n, errScan := loganalyzer.ScanLines(r)
-	if errScan != nil {
-		return errScan
 	}
-	fmt.Printf("count of lines: %d", n)
-	return nil
+	if *toStr != "" {
+		toDate, err = time.ParseInLocation(time.DateOnly, *toStr, time.Local)
+		if err != nil {
+			return fmt.Errorf("parse -to: %w", err)
+		}
+		// добавим сутки, чтобы поиск был интуитивным 2026-08-01 -- 2026-08-01 станет одними сутками, а не нулём
+		toDate = toDate.AddDate(0, 0, 1)
+	}
+
+	if !fromDate.IsZero() && !toDate.IsZero() && fromDate.After(toDate) {
+		return fmt.Errorf("-from %s is after -to %s", *fromStr, *toStr)
+	}
+
+	var total int
+	rest := fs.Args()
+
+	if len(rest) == 0 {
+		total, err = loganalyzer.ScanLines(os.Stdin) // stdin напрямую
+		if err != nil {
+			return err
+		}
+	} else {
+		// определить: файл или директория
+		info, statErr := os.Stat(rest[0])
+		if statErr != nil {
+			return fmt.Errorf("stat input: %w", statErr)
+		}
+		var paths []string
+		if info.IsDir() {
+			paths, err = loganalyzer.ScanDir(rest[0])
+			if err != nil {
+				return fmt.Errorf("scan dir: %w", err)
+			}
+		} else {
+			paths = []string{rest[0]}
+		}
+
+		for _, p := range paths {
+			n, err := loganalyzer.CountFile(p) // обёртка
+			if err != nil {
+				return err
+			}
+			total += n
+		}
+	}
+
+	// формируем writer
+
+	var w io.Writer
+
+	switch *outPath {
+	case "-":
+		w = os.Stdout
+	default:
+		if err := os.MkdirAll(filepath.Dir(*outPath), 0o755); err != nil {
+			return fmt.Errorf("create output dir: %w", err)
+		}
+
+		f, createErr := os.Create(*outPath)
+		if createErr != nil {
+			return fmt.Errorf("create %s: %w", *outPath, createErr)
+		}
+
+		defer func() {
+			if closeErr := f.Close(); closeErr != nil && err == nil {
+				err = fmt.Errorf("close output: %w", closeErr)
+			}
+		}()
+		w = f
+	}
+
+	var outFormat loganalyzer.Formatter
+	switch *format {
+	case "text":
+		outFormat = loganalyzer.TextFormatter{}
+	case "json":
+		outFormat = loganalyzer.JSONFormatter{}
+	case "csv":
+		outFormat = loganalyzer.CSVFormatter{}
+	default:
+		return fmt.Errorf("unknown format %q (want text|json|csv)", *format)
+	}
+
+	report := loganalyzer.Report{Total: total}
+	return outFormat.Format(w, report)
+
 }
