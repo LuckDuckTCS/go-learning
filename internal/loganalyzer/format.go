@@ -7,6 +7,7 @@ import (
 	"io"
 	"maps"
 	"slices"
+	"strconv"
 	"text/tabwriter"
 )
 
@@ -109,8 +110,34 @@ func (TextFormatter) Format(w io.Writer, r Report) error {
 
 func (CSVFormatter) Format(w io.Writer, r Report) error {
 	cw := csv.NewWriter(w)
-	cw.Write([]string{"section", "key", "value"})
+	// csv.Writer запоминает первую ошибку внутри; проверяем один раз через Error() в конце
+	_ = cw.Write([]string{"section", "key", "value"})
 
+	_ = cw.Write([]string{"summary", "total", strconv.Itoa(r.Total)})
+
+	_ = cw.Write([]string{"summary", "broken", strconv.Itoa(r.Broken)})
+
+	statuses := slices.Sorted(maps.Keys(r.ByStatus))
+	for _, key := range statuses {
+		_ = cw.Write([]string{"status", strconv.Itoa(key), strconv.Itoa(r.ByStatus[key])})
+
+	}
+
+	for _, pair := range r.TopURLs {
+		_ = cw.Write([]string{"url", pair.Key, strconv.Itoa(pair.Count)})
+	}
+
+	for _, pair := range r.TopIPs {
+		_ = cw.Write([]string{"ip", pair.Key, strconv.Itoa(pair.Count)})
+	}
+
+	_ = cw.Write([]string{"duration", "avg_sec", strconv.FormatFloat(r.AvgDur, 'f', 3, 64)})
+
+	_ = cw.Write([]string{"duration", "p95_sec", strconv.FormatFloat(r.P95Dur, 'f', 3, 64)})
+
+	for i, str := range r.Examples {
+		_ = cw.Write([]string{"example", strconv.Itoa(i), str})
+	}
 	cw.Flush()
 	return cw.Error()
 }
