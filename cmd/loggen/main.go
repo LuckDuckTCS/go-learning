@@ -107,6 +107,9 @@ func generate(w io.Writer, lines, broken int) error {
 func logLine(i int) string {
 	ip := ips[i%len(ips)]
 	url := urls[(i*7)%len(urls)] // умножение на простое число разводит совпадения
+	if i%3 == 0 {
+		url = "/"
+	}
 	status := statuses[(i*13)%len(statuses)]
 	method := methods[i%len(methods)]
 	size := 200 + (i*31)%9800
