@@ -51,6 +51,18 @@ func run(args []string) (err error) {
 	if *top < 0 {
 		return &InvalidFlagError{Flag: "top", Value: strconv.Itoa(*top)}
 	}
+	// формат
+	var outFormat loganalyzer.Formatter
+	switch *format {
+	case "text":
+		outFormat = loganalyzer.TextFormatter{}
+	case "json":
+		outFormat = loganalyzer.JSONFormatter{}
+	case "csv":
+		outFormat = loganalyzer.CSVFormatter{}
+	default:
+		return fmt.Errorf("unknown format %q (want text|json|csv)", *format)
+	}
 
 	// разбор дат
 	var fromDate, toDate time.Time
@@ -74,11 +86,11 @@ func run(args []string) (err error) {
 		return fmt.Errorf("-from %s is after -to %s", *fromStr, *toStr)
 	}
 
-	var total int
+	a := loganalyzer.NewAggregator()
 	rest := fs.Args()
 
 	if len(rest) == 0 {
-		total, err = loganalyzer.ScanLines(os.Stdin) // stdin напрямую
+		err = loganalyzer.Process(os.Stdin, a, fromDate, toDate) // stdin напрямую
 		if err != nil {
 			return err
 		}
@@ -99,11 +111,10 @@ func run(args []string) (err error) {
 		}
 
 		for _, p := range paths {
-			n, err := loganalyzer.CountFile(p) // обёртка
+			err := loganalyzer.ProcessFile(p, a, fromDate, toDate) // обёртка
 			if err != nil {
 				return err
 			}
-			total += n
 		}
 	}
 
@@ -132,19 +143,7 @@ func run(args []string) (err error) {
 		w = f
 	}
 
-	var outFormat loganalyzer.Formatter
-	switch *format {
-	case "text":
-		outFormat = loganalyzer.TextFormatter{}
-	case "json":
-		outFormat = loganalyzer.JSONFormatter{}
-	case "csv":
-		outFormat = loganalyzer.CSVFormatter{}
-	default:
-		return fmt.Errorf("unknown format %q (want text|json|csv)", *format)
-	}
-
-	report := loganalyzer.Report{Total: total}
+	report := a.Report(*top)
 	return outFormat.Format(w, report)
 
 }

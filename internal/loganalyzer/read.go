@@ -7,28 +7,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
+	"time"
 )
 
-func ScanLines(r io.Reader) (int, error) {
-	scanner := bufio.NewScanner(r)
-	n := 0
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-	for scanner.Scan() {
-		n++
-		//if n%500000 == 0 {
-		//	var ms runtime.MemStats
-		//	runtime.ReadMemStats(&ms)
-		//	fmt.Printf("строк %d, куча %d МБ\n", n, ms.HeapAlloc/1024)
-		//}
-	}
-	if err := scanner.Err(); err != nil {
-		return n, fmt.Errorf("scanning lines: %w", err)
-	}
-	return n, nil
-}
+const maxExampleLen = 80
 
 func ScanDir(dir string) ([]string, error) {
 	result := make([]string, 0, 10)
@@ -55,38 +38,56 @@ func ScanDir(dir string) ([]string, error) {
 	return result, nil
 }
 
-func ScanLinesSlice(r io.Reader) (int, error) {
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	var lines []string
-
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-		if len(lines)%500000 == 0 {
-			var ms runtime.MemStats
-			runtime.ReadMemStats(&ms)
-			fmt.Printf("строк %d, куча %d МБ\n", len(lines), ms.HeapAlloc/1024/1024)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return 0, fmt.Errorf("scanning lines: %w", err)
-	}
-	return len(lines), nil
-}
-
-func CountFile(path string) (n int, err error) {
+func ProcessFile(path string, a *Aggregator, from, to time.Time) (err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return 0, fmt.Errorf("open file: %w", err)
+		return fmt.Errorf("open file %s: %w", path, err)
 	}
 	defer func() {
 		if closeErr := f.Close(); closeErr != nil && err == nil {
-			err = fmt.Errorf("close input: %w", closeErr)
+			err = fmt.Errorf("close input %s: %w", path, closeErr)
 		}
 	}()
-	n, err = ScanLines(f)
+	err = Process(f, a, from, to)
 	if err != nil {
-		return 0, fmt.Errorf("scan lines: %w", err)
+		return fmt.Errorf("process %s: %w", path, err)
 	}
-	return n, nil
+	return nil
+}
+
+func Process(r io.Reader, a *Aggregator, from, to time.Time) error {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	lineNum := 0
+
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Text()
+
+		e, err := ParseLine(line)
+		if err != nil {
+			a.AddBroken(&ParseError{Line: lineNum, Text: truncate(line), Err: err})
+			continue
+		}
+
+		if !from.IsZero() && e.Time.Before(from) {
+			continue
+		}
+		if !to.IsZero() && !e.Time.Before(to) {
+			continue
+		}
+		a.Add(e)
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scanning lines: %w", err)
+	}
+	return nil
+}
+
+func truncate(s string) string {
+	if maxExampleLen >= len(s) {
+		return s
+	}
+	return s[:maxExampleLen] + "..."
 }
