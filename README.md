@@ -48,9 +48,9 @@
 - [x] **13** — Ошибки: `%w`, `errors.Is`/`As`, sentinel-ошибки, свои типы ошибок
 - [x] **14** — Повторение №2 · Git: `restore`, `reset` в трёх режимах, `revert`, `stash`, `reflog`
 - [x] **15** — `defer`, `panic`, `recover`, утечка дескрипторов в цикле, `SafeRun`
-- [ ] **16** — `os`, `bufio.Scanner`, `filepath.WalkDir` · **старт `loganalyzer`**
-- [ ] **17** — CLI: пакет `flag`, `flag.Value`, пакет `time`
-- [ ] **18** — JSON и CSV, парсер access-лога, агрегация
+- [x] **16** — `os`, `bufio.Scanner`, `filepath.WalkDir` · **старт `loganalyzer`**
+- [x] **17** — CLI: пакет `flag`, `flag.Value`, пакет `time`
+- [x] **18** — JSON и CSV, парсер access-лога, агрегация
 
 ### Фаза 3. Тестирование
 
