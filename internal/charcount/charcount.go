@@ -10,7 +10,14 @@ import (
 	"unicode/utf8"
 )
 
-func CharCount(r io.Reader, w io.Writer) error {
+type Counts struct {
+	Runes   map[rune]int
+	Types   map[string]int
+	UTFLen  [utf8.UTFMax + 1]int
+	Invalid int
+}
+
+func CountChars(r io.Reader) (Counts, error) {
 	counts := make(map[rune]int)       // кол-во символов unicode
 	typeCounts := make(map[string]int) // кол-во типов символов (буква, цифра ...)
 	var utfLen [utf8.UTFMax + 1]int    //кол-во длин кодировок utf8
@@ -24,7 +31,7 @@ func CharCount(r io.Reader, w io.Writer) error {
 			break
 		}
 		if err != nil {
-			return err
+			return Counts{}, err
 		}
 		if r == unicode.ReplacementChar && n == 1 {
 			invalid++
@@ -47,23 +54,28 @@ func CharCount(r io.Reader, w io.Writer) error {
 			typeCounts["Other"]++
 		}
 	}
+	return Counts{Runes: counts, Types: typeCounts, UTFLen: utfLen, Invalid: invalid}, nil
+}
+
+func PrintCount(counts Counts, w io.Writer) error {
+
 	fmt.Fprintf(w, "rune\tcount\n")
-	for c, n := range counts {
+	for c, n := range counts.Runes {
 		fmt.Fprintf(w, "%q\t%d\n", c, n)
 	}
 	fmt.Fprintf(w, "Type\tcount\n")
-	for c, n := range typeCounts {
+	for c, n := range counts.Types {
 		fmt.Fprintf(w, "%s\t%d\n", c, n)
 	}
 	fmt.Fprintf(w, "\nlen\tcount\n")
-	for i, n := range utfLen {
+	for i, n := range counts.UTFLen {
 		if i > 0 {
 			fmt.Fprintf(w, "%d\t%d\n", i, n)
 		}
 	}
 
-	if invalid > 0 {
-		fmt.Fprintf(w, "\n%d неверных символов UTF-8\n", invalid)
+	if counts.Invalid > 0 {
+		fmt.Fprintf(w, "\n%d неверных символов UTF-8\n", counts.Invalid)
 	}
 	return nil
 }
