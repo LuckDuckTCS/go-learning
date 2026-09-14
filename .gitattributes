@@ -1,4 +1,4 @@
+* text=auto
 *.go text eol=lf
 *.golden.txt -text
 testdata/** -text
-* text=auto
