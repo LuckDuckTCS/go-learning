@@ -1,0 +1,20 @@
+Total lines:  10
+Broken:       2
+
+Status codes:
+  200  8
+  404  2
+
+Top URLs:
+  /  5
+
+Top IPs:
+  10.0.0.1  3
+
+Duration:
+  Average:  0.250 s
+  p95:      0.400 s
+
+
+Examples:
+  line 1: bad
