@@ -3,6 +3,7 @@ package intset
 import (
 	"bytes"
 	"fmt"
+	"math/bits"
 )
 
 type IntSet struct {
@@ -54,20 +55,16 @@ func (s *IntSet) String() string {
 	return buf.String()
 }
 
-// Возвращает количество элементов
+// Len Возвращает количество элементов
 func (s *IntSet) Len() int {
 	var count int
 	for _, word := range s.words {
-		for i := 0; i < 64; i++ {
-			if word&(uint64(1)<<uint(i)) != 0 {
-				count++
-			}
-		}
+		count += bits.OnesCount64(word)
 	}
 	return count
 }
 
-// Удаляет x из множества
+// Remove Удаляет x из множества
 func (s *IntSet) Remove(x int) {
 	word, bit := x/64, x%64
 	if word < len(s.words) {
@@ -75,7 +72,7 @@ func (s *IntSet) Remove(x int) {
 	}
 }
 
-// удаляет все элементы множества
+// Clear удаляет все элементы множества
 func (s *IntSet) Clear() {
 	clear(s.words)
 }
