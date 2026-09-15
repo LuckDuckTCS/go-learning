@@ -150,11 +150,24 @@ func TestFormatterError(t *testing.T) {
 		Examples: []string{"line 1: bad"},
 	}
 
-	var fw failWriter
-	fw.err = errors.New("something wrong")
+	wantErr := errors.New("write failed")
+	fw := failWriter{err: wantErr}
 
-	err := (TextFormatter{}).Format(fw, r)
-	if !errors.Is(err, fw.err) {
-		t.Errorf("Format() error = %v, want %v in chain", err, fw.err)
+	formatters := map[string]Formatter{
+		"text": TextFormatter{},
+		"json": JSONFormatter{},
+		"csv":  CSVFormatter{},
+	}
+
+	for name, f := range formatters {
+		t.Run(name, func(t *testing.T) {
+			err := f.Format(fw, r)
+			if err == nil {
+				t.Fatal("Format() error = nil, want error")
+			}
+			if !errors.Is(err, wantErr) {
+				t.Errorf("Format() error = %v, want %v in chain", err, wantErr)
+			}
+		})
 	}
 }
