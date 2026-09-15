@@ -133,3 +133,15 @@ func differenceMaps(a, b map[int]bool) map[int]bool {
 func symmetricDiffMaps(a, b map[int]bool) map[int]bool {
 	return unionMaps(differenceMaps(a, b), differenceMaps(b, a))
 }
+
+func BenchmarkIntSetLen(b *testing.B) {
+	var s IntSet
+	for i := 0; i < 640; i += 7 {
+		s.Add(i)
+	}
+
+	b.ResetTimer()
+	for b.Loop() {
+		s.Len()
+	}
+}
