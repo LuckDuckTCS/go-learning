@@ -135,3 +135,10 @@ func TestParseErrorChain(t *testing.T) {
 		t.Error("errors.As found ParseError in unrelated error")
 	}
 }
+
+func BenchmarkParseLine(b *testing.B) {
+	const line = `192.168.1.1 - - [01/Aug/2026:00:00:00 +0300] "GET /api/users HTTP/1.1" 200 1234 0.045`
+	for b.Loop() {
+		_, _ = ParseLine(line)
+	}
+}
