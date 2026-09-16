@@ -65,7 +65,7 @@ func Process(r io.Reader, a *Aggregator, from, to time.Time) error {
 		lineNum++
 		line := scanner.Text()
 
-		e, err := ParseLine(line)
+		e, err := ParseLineManual(line)
 		if err != nil {
 			a.AddBroken(&ParseError{Line: lineNum, Text: truncate(line), Err: err})
 			continue
