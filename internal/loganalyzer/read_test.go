@@ -1,6 +1,7 @@
 package loganalyzer
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -186,5 +187,18 @@ func TestScanDir(t *testing.T) {
 	}
 	if errEmpty != nil {
 		t.Errorf("error ScanDir(t.TempDir()) = %v, want nil", errEmpty)
+	}
+}
+
+func BenchmarkProcess(b *testing.B) {
+	data, err := os.ReadFile("testdata/bench.log")
+	if err != nil {
+		b.Skipf("no bench data: %v", err)
+	}
+
+	b.ResetTimer()
+	for b.Loop() {
+		a := NewAggregator()
+		_ = Process(bytes.NewReader(data), a, time.Time{}, time.Time{})
 	}
 }
