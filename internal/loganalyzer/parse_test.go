@@ -91,16 +91,22 @@ func TestParseLine(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := ParseLine(tc.input)
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("error = %v, wantErr %v", err, tc.wantErr)
-			}
-			if diff := cmp.Diff(got, tc.want); diff != "" {
-				t.Errorf("ParseLine() mismatch (-got +want):\n%s", diff)
-			}
-		})
+	impls := map[string]func(string) (Entry, error){
+		"regexp": ParseLine,
+		"manual": ParseLineManual,
+	}
+	for implName, parse := range impls {
+		for _, tc := range tests {
+			t.Run(implName+"/"+tc.name, func(t *testing.T) {
+				got, err := parse(tc.input)
+				if (err != nil) != tc.wantErr {
+					t.Fatalf("error = %v, wantErr %v", err, tc.wantErr)
+				}
+				if diff := cmp.Diff(got, tc.want); diff != "" {
+					t.Errorf("ParseLine() mismatch (-got +want):\n%s", diff)
+				}
+			})
+		}
 	}
 }
 
@@ -140,5 +146,36 @@ func BenchmarkParseLine(b *testing.B) {
 	const line = `192.168.1.1 - - [01/Aug/2026:00:00:00 +0300] "GET /api/users HTTP/1.1" 200 1234 0.045`
 	for b.Loop() {
 		_, _ = ParseLine(line)
+	}
+}
+
+func FuzzParseLineEquivalence(f *testing.F) {
+	f.Add(`192.168.1.1 - - [01/Aug/2026:00:00:00 +0300] "GET /api/users HTTP/1.1" 200 1234 0.045`)
+	f.Add(`10.0.0.42 - - [01/Aug/2026:00:00:01 +0300] "POST /login HTTP/1.1" 301 0 0.012`)
+	f.Add("trash")
+	f.Add("")
+
+	f.Fuzz(func(t *testing.T, s string) {
+		e1, err1 := ParseLine(s)
+		e2, err2 := ParseLineManual(s)
+
+		if (err1 == nil) != (err2 == nil) {
+			t.Fatalf("disagreement on error: regexp err=%v, manual err=%v", err1, err2)
+		}
+
+		if err1 != nil {
+			return
+		}
+
+		if diff := cmp.Diff(e1, e2); diff != "" {
+			t.Errorf("different results (-regexp +manual):\n%s", diff)
+		}
+	})
+}
+
+func BenchmarkParseLineManual(b *testing.B) {
+	const line = `192.168.1.1 - - [01/Aug/2026:00:00:00 +0300] "GET /api/users HTTP/1.1" 200 1234 0.045`
+	for b.Loop() {
+		_, _ = ParseLineManual(line)
 	}
 }
