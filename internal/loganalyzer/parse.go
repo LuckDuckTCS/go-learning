@@ -36,6 +36,7 @@ func (e *ParseError) Unwrap() error {
 
 var lineRe = regexp.MustCompile(`^(\S+) - - \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+) ([\d.]+)$`)
 
+// ParseLine эталонная реализация, разбирает строку лога
 func ParseLine(s string) (Entry, error) {
 	m := lineRe.FindStringSubmatch(s)
 	if m == nil {
