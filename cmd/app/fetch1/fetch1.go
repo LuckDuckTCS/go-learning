@@ -2,43 +2,47 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 )
 
 func main() {
 	start := time.Now()
 	ch := make(chan string)
-	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for _, url := range os.Args[1:] {
-		go fetch(url, ch, done) // запуск горутины
+		go fetch(ctx, url, ch) // запуск горутины
 	}
 	fmt.Println(<-ch) // первый полученный ответ
-	close(done)
+	cancel()
 	fmt.Printf("%.2fs elapsed\n", time.Since(start).Seconds())
+	fmt.Println(runtime.NumGoroutine())
 }
 
 // fetch загружает URL и отправляет в ch время выполнения и размер ответа.
-// добавил отмену как того хочет упр. 8.11 (устаревшим форматом)
-func fetch(url string, ch chan<- string, done <-chan struct{}) {
+
+func fetch(ctx context.Context, url string, ch chan<- string) {
 	start := time.Now()
-	req, err := http.NewRequest("GET", url, nil)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		select {
 		case ch <- fmt.Sprint(err):
-		case <-done:
+		case <-ctx.Done():
 		}
 		return
 	}
-	req.Cancel = done
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		select {
 		case ch <- fmt.Sprint(err):
-		case <-done:
+		case <-ctx.Done():
 		}
 		return
 	}
@@ -47,13 +51,13 @@ func fetch(url string, ch chan<- string, done <-chan struct{}) {
 	if err != nil {
 		select {
 		case ch <- fmt.Sprintf("while reading %s: %v", url, err):
-		case <-done:
+		case <-ctx.Done():
 		}
 		return
 	}
 	secs := time.Since(start).Seconds()
 	select {
 	case ch <- fmt.Sprintf("%.2fs  %7d  %s", secs, nbytes, url):
-	case <-done:
+	case <-ctx.Done():
 	}
 }
