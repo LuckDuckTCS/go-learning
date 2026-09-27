@@ -1,20 +1,25 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 )
 
 const N = 10 // число воркеров
 
-func ScanDir(dir string, paths chan<- string) {
+func ScanDir(ctx context.Context, dir string, paths chan<- string) {
+	defer close(paths)
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if d != nil && d.IsDir() {
@@ -26,13 +31,17 @@ func ScanDir(dir string, paths chan<- string) {
 		if d.IsDir() {
 			return nil
 		}
-		paths <- path
+		select {
+		case paths <- path:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 		return nil
 	})
-	if err != nil {
+
+	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 		log.Printf("scan dir %s: %v", dir, err)
 	}
-	close(paths)
 }
 
 type result struct {
@@ -53,8 +62,12 @@ func main() {
 
 	paths := make(chan string)
 	results := make(chan result)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
-	go ScanDir(pathDir[0], paths)
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	go ScanDir(ctx, pathDir[0], paths)
 
 	var wg sync.WaitGroup
 
@@ -63,7 +76,11 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for path := range paths {
-				results <- hashFile(path)
+				select {
+				case results <- hashFile(path):
+				case <-ctx.Done():
+					return
+				}
 			}
 		}()
 	}
@@ -80,6 +97,7 @@ func main() {
 			fmt.Printf("path: %s\thash: %s\n", data.path, data.sum)
 		}
 	}
+	fmt.Println(runtime.NumGoroutine())
 	fmt.Fprintln(os.Stderr, time.Since(start))
 }
 
