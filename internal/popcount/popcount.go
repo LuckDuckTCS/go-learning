@@ -1,12 +1,15 @@
 // Package popcount предоставляет функции подсчёта единичных битов.
 package popcount
 
-import "math/bits"
+import (
+	"math/bits"
+	"sync"
+)
 
 // pc[i] — количество единичных битов в байте i.
 var pc [256]byte
 
-func init() {
+func initTable() {
 	for i := range pc {
 		pc[i] = pc[i/2] + byte(i&1)
 	}
@@ -14,7 +17,10 @@ func init() {
 
 // PopCountTable возвращает количество единичных битов в x,
 // используя предвычисленную таблицу.
+var initOnce sync.Once
+
 func PopCountTable(x uint64) int {
+	initOnce.Do(initTable)
 	return int(pc[byte(x>>(0*8))] +
 		pc[byte(x>>(1*8))] +
 		pc[byte(x>>(2*8))] +
