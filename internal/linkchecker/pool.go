@@ -3,6 +3,7 @@ package linkchecker
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,30 +21,25 @@ func Process(ctx context.Context, r io.Reader, client *http.Client, workers, att
 	results := make(chan Result, workers/2)
 	errorChan := make(chan error, 1)
 
-	urlcount := 0
-
-	for scanner.Scan() {
-		urlcount++
-		url := scanner.Text()
-		g.Go(func() error {
-			res := CheckWithRetry(ctx, client, url, attempts)
-			select {
-			case results <- res:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-			return nil
-		})
-
-	}
-	if err := scanner.Err(); err != nil {
-		return []Result{}, fmt.Errorf("scanning lines: %w", err)
-	}
 	go func() {
-		errorChan <- g.Wait()
-		close(results)
+		defer close(results)
+		for scanner.Scan() {
+			url := scanner.Text()
+			g.Go(func() error {
+				res := CheckWithRetry(ctx, client, url, attempts)
+				select {
+				case results <- res:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				return nil
+			})
+		}
+		scanErr := scanner.Err()
+		errorChan <- errors.Join(scanErr, g.Wait())
 	}()
-	out := make([]Result, 0, urlcount)
+
+	out := make([]Result, 0)
 	for result := range results {
 		out = append(out, result)
 	}
