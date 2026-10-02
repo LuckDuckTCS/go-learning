@@ -4,7 +4,7 @@
 
 Цель — не пройти туториалы, а научиться писать многопакетные CLI-утилиты и HTTP-сервисы: интерфейсы, потоковый ввод-вывод, обработка ошибок, конкурентность, тесты.
 
-**Прогресс:** 28 / 40 дней · фаза 4 из 6
+**Прогресс:** 30 / 40 дней · фаза 4 из 6
 
 ---
 
@@ -17,7 +17,7 @@
 | `IntSet` | 5–6 | Битовое множество, упражнения 6.1–6.5 | готов |
 | `wordfreq` | 10–13 | `io.Reader`/`io.Writer`, интерфейс `Formatter`, слой ошибок с `%w` | готов без тестов |
 | `loganalyzer` | 16–22 | Потоковая обработка больших файлов, CLI, JSON/CSV, тесты, бенчмарки, фаззинг | готов |
-| `linkchecker` | 23–31 | Горутины, каналы, `context`, `errgroup`, ретраи | — |
+| `linkchecker` | 23–31 | Горутины, каналы, `context`, `errgroup`, ретраи, тесты с `httptest` | готов |
 | `shortener` | 32–40 | HTTP API, middleware, `slog`, Postgres, Docker | — |
 
 ---
@@ -141,6 +141,59 @@ go run ./cmd/loggen -long=2097152 -out=testdata/edge/longline.log
 
 ---
 
+## linkchecker
+
+Проверяет список URL параллельно: отправляет запрос на каждый, собирает статусы и время ответа, печатает отчёт с разбивкой на живые, редиректы и битые ссылки.
+
+Пул воркеров построен на `errgroup` с лимитом. Временные сбои (5xx, сетевые ошибки) повторяются с экспоненциальной задержкой и джиттером; 4xx повторов не вызывают. Ctrl+C останавливает проверку и печатает частичный отчёт.
+
+### Запуск
+
+```bash
+go run ./cmd/linkchecker [флаги] <файл со списком URL>
+cat urls.txt | go run ./cmd/linkchecker [флаги]
+```
+
+Формат входа — по одному URL на строку.
+
+### Флаги
+
+| Флаг | По умолчанию | Описание |
+|---|---|---|
+| `-workers` | `10` | число одновременных проверок |
+| `-attempts` | `5` | попыток на ссылку при временных сбоях |
+| `-timeout` | `5` | таймаут одного запроса, секунды |
+| `-format` | `text` | формат вывода: `text`, `json` |
+
+### Пример вывода
+
+```
+$ go run ./cmd/linkchecker -workers=20 urls.txt
+        Report:
+Total:  20
+OK:     8
+Redirects:      5
+Broken: 7
+
+        Redirects:
+http://github.com ---> https://github.com/
+http://go.dev ---> https://go.dev/
+https://go.dev/blog ---> https://go.dev/blog/
+
+        Broken:
+https://go.dev/nosuchpage404    status:404 error:<nil>
+http://nosuchdomain-qwerty12345.com     status:0 error:Get "http://nosuchdomain-qwerty12345.com": dial tcp: lookup nosuchdomain-qwerty12345.com: no such host
+https://httpbin.org/delay/10    status:0 error:Get "https://httpbin.org/delay/10": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+```
+
+Редиректы не раскрываются: клиент настроен возвращать 3xx как есть, а поле `Location` приводится к абсолютному URL.
+
+### Тесты
+
+`httptest.Server` вместо моков: поднимается настоящий сервер, обработчик считает обращения. Так проверяется то, чего не видно в результате — например, что 404 не вызывает повторов, а 503 исчерпывает все попытки.
+
+---
+
 ## Прогресс по дням
 
 ### Фаза 0. Git и модули
@@ -176,7 +229,7 @@ go run ./cmd/loggen -long=2097152 -out=testdata/edge/longline.log
 - [x] **19** — `go test`, табличные тесты, `t.Run`, `t.TempDir`
 - [x] **20** — Покрытие, моки через интерфейсы, golden-файлы
 - [x] **21** — Бенчмарки, `-benchmem`, профилирование через `pprof`
-- [-] **22** — Повторение №3 · Git: `bisect`, `blame`, pre-commit хуки
+- [ ] **22** — Повторение №3 · Git: `bisect`, `blame`, pre-commit хуки
 
 ### Фаза 4. Конкурентность
 
@@ -186,8 +239,8 @@ go run ./cmd/loggen -long=2097152 -out=testdata/edge/longline.log
 - [x] **26** — `select`, таймауты, отмена
 - [x] **27** — `context`: отмена по цепочке, дедлайны
 - [x] **28** — Гонки, `sync.Mutex`, `RWMutex`
-- [ ] **29** — Модель памяти, `sync.Once`, `sync/atomic`
-- [ ] **30** — Worker pool, `errgroup`, семафор · **проект `linkchecker`**
+- [x] **29** — Модель памяти, `sync.Once`, `sync/atomic`
+- [x] **30** — Worker pool, `errgroup`, семафор · **проект `linkchecker`**
 - [ ] **31** — Повторение №4
 
 ### Фаза 5. Дженерики и HTTP
