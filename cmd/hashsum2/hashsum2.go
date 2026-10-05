@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -23,14 +22,16 @@ func ScanDir(ctx context.Context, dir string, paths chan<- string) {
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if d != nil && d.IsDir() {
-				log.Printf("skip %s: %v\n", path, err)
-				return fs.SkipDir
+				log.Printf("access denied %s: %v\n", path, err)
+				return filepath.SkipDir
 			}
 			return nil
 		}
+
 		if d.IsDir() {
 			return nil
 		}
+
 		select {
 		case paths <- path:
 		case <-ctx.Done():
@@ -38,7 +39,6 @@ func ScanDir(ctx context.Context, dir string, paths chan<- string) {
 		}
 		return nil
 	})
-
 	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 		log.Printf("scan dir %s: %v", dir, err)
 	}
@@ -51,25 +51,25 @@ type result struct {
 }
 
 func main() {
-	start := time.Now()
-	pathDir := os.Args[1:]
-	if len(pathDir) == 0 {
+	pathsDir := os.Args[1:]
+	if len(pathsDir) == 0 {
 		log.Fatal("error: empty dir")
 	}
-	if len(pathDir) > 1 {
+	if len(pathsDir) > 1 {
 		log.Fatal("error: more than one dir")
 	}
 
 	paths := make(chan string)
 	results := make(chan result)
+
+	var wg sync.WaitGroup
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	go ScanDir(ctx, pathDir[0], paths)
 
-	var wg sync.WaitGroup
+	go ScanDir(ctx, pathsDir[0], paths)
 
 	for range N {
 		wg.Add(1)
@@ -82,6 +82,7 @@ func main() {
 					return
 				}
 			}
+
 		}()
 	}
 
@@ -92,13 +93,11 @@ func main() {
 
 	for data := range results {
 		if data.err != nil {
-			fmt.Printf("!error!\tpath: %s\terr: %s\n", data.path, data.err)
+			log.Printf("!error!\tpath: %s\terr: %s\n", data.path, data.err)
 		} else {
 			fmt.Printf("path: %s\thash: %s\n", data.path, data.sum)
 		}
 	}
-	fmt.Println(runtime.NumGoroutine())
-	fmt.Fprintln(os.Stderr, time.Since(start))
 }
 
 func hashFile(path string) result {
@@ -111,8 +110,9 @@ func hashFile(path string) result {
 	h := sha256.New()
 	_, err = io.Copy(h, f)
 	if err != nil {
-		return result{path: path, sum: "", err: err}
+		return result{path: path, err: err}
 	}
 	sum := h.Sum(nil)
-	return result{path: path, sum: fmt.Sprintf("%x", sum), err: nil}
+
+	return result{path: path, sum: fmt.Sprintf("%x", sum), err: err}
 }

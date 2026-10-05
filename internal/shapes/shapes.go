@@ -53,7 +53,7 @@ func (s Triangle) Area() float64 {
 
 }
 
-//кольцо
+// кольцо
 func (s Ring) Perimeter() float64 {
 	return 2 * math.Pi * (s.Outer + s.Inner)
 }
